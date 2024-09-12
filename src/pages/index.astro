@@ -1,13 +1,24 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { StatsigClient } from '@statsig/js-client';
 
 const cookies = Astro.request.headers.get('cookie') || '';
 const userUUIDCookie = cookies
   .split('; ')
   .find((cookie) => cookie.startsWith('userUUID='))
   ?.split('=')[1] || 'undefined';
-  console.log(cookies)
-  console.log(userUUIDCookie)
+
+// Send event from Astro, for example page load
+const statsigClient = new StatsigClient(
+  "client-NFtwvHUY3QSTeo8CVRiyDwHySmWs8wtIg2X1bmxnHPA", 
+  { userID: userUUIDCookie }
+);
+
+await statsigClient.initializeAsync();
+statsigClient.logEvent("page_view", "home", {
+  test_parameter: "test value",
+});
+await statsigClient.flush();
 ---
 
 <Layout title="Welcome to Astro.">
@@ -17,10 +28,37 @@ const userUUIDCookie = cookies
 			This is an example CF Pages site which will represent a client website with a CF worker in front of it.
 		</p>
 		<p class="data">
-			Your current <code>userUUID</code> cookie is: <code>{ userUUIDCookie }</code>
+			Your current <code>userUUID</code> cookie is: <code>{ userUUIDCookie }</code>. This is set by the CF Worker.
+            <br /><br />
+            A Statsig event for <code>page_view</code> has been logged by Astro.
+            <br /><br />
+            Click this button to trigger a client side <code>add_to_cart</code> event. <button data-user-uuid-cookie={userUUIDCookie} id="atc-btn" type="button">Send ATC Event</button>
 		</p>
 	</main>
 </Layout>
+
+<script>
+import { StatsigClient } from '@statsig/js-client';
+
+const button = document.getElementById('atc-btn');
+const userUUIDCookie = button.dataset.userUuidCookie;
+
+const statsigClient = new StatsigClient(
+    "client-NFtwvHUY3QSTeo8CVRiyDwHySmWs8wtIg2X1bmxnHPA", 
+    { userID: userUUIDCookie }
+);
+
+button.addEventListener('click', async () => {
+    // Send event from JS, for example user clicks ATC button
+    await statsigClient.initializeAsync();
+    statsigClient.logEvent("add_to_cart", "SKU_12345", {
+        price: "9.99",
+        item_name: "diet_coke_48_pack",
+    });
+    await statsigClient.flush();
+})
+
+</script>
 
 <style>
 	main {
@@ -86,4 +124,12 @@ const userUUIDCookie = cookies
 		gap: 2rem;
 		padding: 0;
 	}
+    button {
+        padding: 6px 12px;
+		border: 1px solid rgba(var(--accent-light), 25%);
+		background: linear-gradient(rgba(var(--accent-dark), 66%), rgba(var(--accent-dark), 33%));
+        color: #fff;
+        border-radius: 4px;
+        cursor: pointer;
+    }
 </style>
