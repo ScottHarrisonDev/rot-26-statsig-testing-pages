@@ -1,6 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import { StatsigClient } from '@statsig/js-client';
+const { env } = Astro.locals.runtime;
 
 const cookies = Astro.request.headers.get('cookie') || '';
 const userUUIDCookie = cookies
@@ -8,16 +9,33 @@ const userUUIDCookie = cookies
   .find((cookie) => cookie.startsWith('userUUID='))
   ?.split('=')[1] || 'undefined';
 
+const statsigUser = {
+    userID: userUUIDCookie,
+    email: 'scott.harrison@studiorotate.com'
+}
+
+// Fetch Statsig features and experiments
+const statsigAssignmentsResponse = await fetch(env.STATSIG_AGGREGATOR_URL, {
+    body: JSON.stringify({userID: userUUIDCookie}),
+    method: "POST"
+});
+const statsigAssignmentsRaw = await statsigAssignmentsResponse.json()
+
+const statsigAssignments = Object.values(statsigAssignmentsRaw)
+  .filter(({ value }) => value)
+  .map(({ name }) => name);
+
 // Send event from Astro, for example page load
 const statsigClient = new StatsigClient(
-  "client-NFtwvHUY3QSTeo8CVRiyDwHySmWs8wtIg2X1bmxnHPA", 
-  { userID: userUUIDCookie }
+  env.STATSIG_CLIENT_KEY, 
+  statsigUser
 );
 
 await statsigClient.initializeAsync();
 statsigClient.logEvent("page_view", "home", {
   test_parameter: "test value",
 });
+
 await statsigClient.flush();
 ---
 
@@ -25,7 +43,7 @@ await statsigClient.flush();
 	<main>
 		<h1>CF Workers with <span class="text-gradient">Statsig</span></h1>
 		<p class="instructions">
-			This is an example CF Pages site which will represent a client website with a CF worker in front of it.
+			This is an example CF Pages site which will represent a client website. There is a Cookie Middleware Worker which handles the userUUID cookie assignment used when communicating with Statsig. There is also a Statsig Aggregator Worker which accepts the Statsig userID and returns a full list of feature keys and experiments applicable to the current session.
 		</p>
 		<p class="data">
 			Your current <code>userUUID</code> cookie is: <code>{ userUUIDCookie }</code>. This is set by the CF Worker.
@@ -33,18 +51,20 @@ await statsigClient.flush();
             A Statsig event for <code>page_view</code> has been logged by Astro.
             <br /><br />
             Click this button to trigger a client side <code>add_to_cart</code> event. <button data-user-uuid-cookie={userUUIDCookie} id="atc-btn" type="button">Send ATC Event</button>
+            <br /><br />
+            The test gates which are passing for this session are: <code>{ statsigAssignments.join() }</code>
 		</p>
 	</main>
 </Layout>
 
-<script>
+<script is:inline>
 import { StatsigClient } from '@statsig/js-client';
 
 const button = document.getElementById('atc-btn');
 const userUUIDCookie = button.dataset.userUuidCookie;
 
 const statsigClient = new StatsigClient(
-    "client-NFtwvHUY3QSTeo8CVRiyDwHySmWs8wtIg2X1bmxnHPA", 
+	env.STATSIG_CLIENT_KEY, 
     { userID: userUUIDCookie }
 );
 
