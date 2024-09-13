@@ -19,11 +19,10 @@ const statsigAssignmentsResponse = await fetch(env.STATSIG_AGGREGATOR_URL, {
     body: JSON.stringify({userID: userUUIDCookie}),
     method: "POST"
 });
-const statsigAssignmentsRaw = await statsigAssignmentsResponse.json()
+const statsigAssignmentsResponseJSON = await statsigAssignmentsResponse.json()
 
-const statsigAssignments = Object.values(statsigAssignmentsRaw)
-  .filter(({ value }) => value)
-  .map(({ name }) => name);
+const cacheKey = statsigAssignmentsResponseJSON.cacheKey
+const assignments = statsigAssignmentsResponseJSON.passingAssignments
 
 // Send event from Astro, for example page load
 const statsigClient = new StatsigClient(
@@ -52,7 +51,13 @@ await statsigClient.flush();
             <br /><br />
             Click this button to trigger a client side <code>add_to_cart</code> event. <button data-user-uuid-cookie={userUUIDCookie} id="atc-btn" type="button">Send ATC Event</button>
             <br /><br />
-            The test gates which are passing for this session are: <code>{ statsigAssignments.join() }</code>
+            The test gates which are passing for this session are:
+			<br />
+			<code>{ assignments.join() }</code>
+			<br /><br />
+            The example cache key for this session would be:
+			<br />
+			<code>{ cacheKey }</code>
 		</p>
 	</main>
 </Layout>
